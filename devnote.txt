@@ -1,0 +1,172 @@
+2010年 11月 16日 星期二 11:13:45 CST
+昨天研究php编译出的东西测试，发现问题一堆是在无法用。现在继续，消息头和消息体已经完成了。校验直接strlen吧,挖个函数得挖半天，以后再加影响也不大。server对client的消息的广播的实现。
+http://blog.csdn.net/mynote/archive/2010/04/29/5542020.aspx
+http://www.cppblog.com/johndragon/archive/2010/04/29/113849.html
+大致是在场景里放一个广播触发器，还有一种是用连接和无连接的客户端的判断来优化。TODO，我先实现广播吧。其实就是给线程触发一个函数。
+连接消息头和消息体完成。
+
+
+2010年 11月 14日 星期日 20:51:40 CST
+休息了一天，今日下午继续工作了一部分代码，开始认为要做个字典，字典的key作为define的宏，value可以随意调整，后来发现不如做成个enum类型，数字状态码当做命令，直接sprint格式化成字符串后再send。stl的map就是实现了字典的功能，另外看了下memcache，发现今后也可以这么搞，但是要把string的hash作为key。暂时就这么搞吧，明日继续完成消息体的设计。打算使用的格式为json。 
+
+2010年 11月 12日 星期五 10:30:58 CST
+协议格式暂定为文本。开始写界面消息的打包函数(其实还是文本，就是构造字符串)。
+先定义一些宏
+
+2010年 11月 11日 星期四 10:18:30 CST
+配置添加好，接收缓冲和发送缓冲等一些连接变量都放到CONNDATA结构。先做界面消息，相当于广播。
+
+2010年 11月 10日 星期三 23:31:11 CST
+已经将连接结构加好了，calloc居然给忘记写了，就直接开始memset了；写config.c的时候发现不要头文件不include头文件，照样可以用config.c的函数，前提是在main.h里面要声明好config.c的函数,还没有试验出来。
+http://bbs.chinaunix.net/viewthread.php?tid=1703609&extra=&page=1
+C语言没有头文件是没有问题的，C++没有头文件就会报错的，抄nuhttpd的代码的时候就遇到了类似的问题。还发现c语言里不要extern关键字就可以在其他include本文件的文件应用本文件的全局变量。而在C++里，这是不被允许的。
+
+2010年 11月 10日 星期三 16:02:16 CST
+进度目前达到了客户端和服务器消息可以交互，telnet没有问题，并发500服务器不会垮掉，但需要处理老的长连接。这部分不管，开始开发协议。参考nullhttp的几个主要文件，并且参看《Online-game服务器端设计(1、2)》，协议的格式已经确定。
+发现和nullhttpd的连接结构是差不多的。
+typedef connection_s {
+
+	user_t *ob; /* 指向处理服务器端逻辑的结构 */
+
+	int fd; /* socket连接 */
+
+	struct sockaddr_in addr; /* 连接的地址信息 */
+
+	char text[MAX_TEXT]; /* 接收的消息缓冲 */
+
+	int text_end; /* 接收消息缓冲的尾指针 */
+
+	int text_start; /* 接收消息缓冲的头指针 */
+
+	int last_time; /* 上一条消息是什么时候接收到的 */
+
+	struct timeval latency; /* 客户端本地时间和服务器本地时间的差值 */
+
+	struct timeval last_confirm_time; /* 上一次验证的时间 */
+
+	short is_confirmed; /* 该连接是否通过验证过 */
+
+	int ping_num; /* 该客户端到服务器端的ping值 */
+
+	int ping_ticker; /* 多少个IO周期处理更新一次ping值 */
+
+	int message_length; /* 发送缓冲消息长度 */
+
+	char message_buf[MAX_TEXT]; /* 发送缓冲区 */
+
+	int iflags; /* 该连接的状态 */
+
+} connection_t;
+
+看了下nuhttpd的判断最大连接数
+for (i=0;;i++) {
+	if (i>=config.server_maxconn) {
+		sleep(1);
+		i=0;
+		continue;
+	}
+	if (conn[i].socket==0) break;
+}
+这个是等待连接关闭吧，一个客户线程结束再来其余的，否则满了，我这里是长连接？
+
+2010年 11月 10日 星期三 16:02:10 CST
+server开发现在问题
+一个客户一个线程，可以接收第二个客户，但是没有加线程锁，同步有问题。
+而且第二个客户close套接字，整个server就close了。
+客户端本线程粗暴挂断同样整个server挂断。应捕捉一个error
+对于优雅的close也没有判断
+
+调试发现send会退出，原因很低级，没有构造好要发送的字符串。
+但是send构造好了还是会挂！
+不send就没问题！也就是要检查客户端挂断！
+现在问题转到了怎么判断客户端close掉socket连接了。
+
+send的返回值
+http://hi.baidu.com/tim_bi/blog/item/01b52f97bd6a3d6054fb967e.html
+
+一个线程挂掉整个程序会挂吗？
+
+这个问题我也遇到过 ， 之前用 select  检测的 ，客户端关闭 服务端就关闭了 。 现在用epoll了 ，客户端关闭，epoll就会检测到epollerror事件， 而不会down掉了 呵呵
+
+
+往一个已经关闭的socket中写数据，进程会退出的问题
+（用select的时候也会有这个问题的）
+http://bbs.chinaunix.net/thread-1577117-1-1.html
+
+
+gdb thPollServd
+r 24558
+│Program received signal SIGPIPE, Broken pipe.
+│[Switching to Thread 0xb7f57b90 (LWP 4836)]
+│0xb7f5b424 in __kernel_vsyscall ()
+
+
+	《关于SIGPIPE导致的程序退出》
+	http://www.cppblog.com/elva/archive/2008/09/10/61544.html
+
+
+	《遭遇SIGPIPE》
+	http://www.ideawu.net/blog/archives/413.html
+
+
+	只有send才会出来SIGPIPE
+
+	看下面这篇文章来解决SIGPIPE
+	http://bbs.chinaunix.net/archiver/tid-1681391.html
+	主要是这些代码
+#ifndef WIN32
+	sigset_t signal_mask;
+	sigemptyset (&signal_mask);
+	sigaddset (&signal_mask, SIGPIPE);
+	int rc = pthread_sigmask (SIG_BLOCK, &signal_mask, NULL);
+if (rc != 0)
+{
+	printf("block sigpipe error\n");
+}
+#endif
+子线程自动继承主线程的信号属性。
+如果用gdb调试还是出现SIGPIPE，是因为gdb也要设置环境变量
+“我的这个问题应该是出在gdb 的环境没有设置好。 gdb应该设置为handle  SIGPIPE    nostop ”
+
+好了终于解决这个问题，接下来还有个线程安全和同步的问题，现在直接把括在最外面的互斥拿掉了！
+
+
+
+符号名　　信号值 描述　　　　　　　　　　　　　　　　是否符合POSIX
+SIGHUP　　1　　　在控制终端上检测到挂断或控制线程死亡　　是
+SIGINT　　2　　　交互注意信号　　　　　　　　　　　　　　是
+SIGQUIT　 3　　　交互中止信号　　　　　　　　　　　　　　是
+SIGILL　　4　　　检测到非法硬件的指令　　　　　　　　　　是
+SIGTRAP　 5　　　从陷阱中回朔　　　　　　　　　　　　　　否
+SIGABRT　 6　　　异常终止信号　　　　　　　　　　　　　　是
+SIGEMT　　7　　　EMT 指令　　　　　　　　　　　　　　　　否
+SIGFPE　　8　　　不正确的算术操作信号　　　　　　　　　　是
+SIGKILL　 9　　　终止信号　　　　　　　　　　　　　　　　是
+SIGBUS　　10　　 总线错误　　　　　　　　　　　　　　　　否
+SIGSEGV　 11　　 检测到非法的内存调用　　　　　　　　　　是
+SIGSYS　　12　　 系统call的错误参数　　　　　　　　　　　否
+SIGPIPE　 13　　 在无读者的管道上写　　　　　　　　　　　是
+SIGALRM　 14　　 报时信号　　　　　　　　　　　　　　　　是
+SIGTERM　 15　　 终止信号　　　　　　　　　　　　　　　　是
+SIGURG　　16　　 IO信道紧急信号　　　　　　　　　　　　　否
+SIGSTOP　 17　　 暂停信号　　　　　　　　　　　　　　　　是
+SIGTSTP　 18　　 交互暂停信号　　　　　　　　　　　　　　是
+SIGCONT　 19　　 如果暂停则继续　　　　　　　　　　　　　是
+SIGCHLD　 20　　 子线程终止或暂停　　　　　　　　　　　　是
+SIGTTIN　 21　　 后台线程组一成员试图从控制终端上读出　　是
+SIGTTOU　 22　　 后台线程组的成员试图写到控制终端上　　　是
+SIGIO　　 23　　 允许I/O信号 　　　　　　　　　　　　　　否
+SIGXCPU　 24　　 超出CPU时限　　　　　　　　　　　　　　 否
+SIGXFSZ　 25　　 超出文件大小限制　　　　　　　　　　　　否
+SIGVTALRM 26　　 虚时间警报器　　　　　　　　　　　　　　否
+SIGPROF　 27　　 侧面时间警报器　　　　　　　　　　　　　否
+SIGWINCH　28　　 窗口大小的更改　　　　　　　　　　　　　否
+SIGINFO　 29　　 消息请求　　　　　　　　　　　　　　　　否
+SIGUSR1 　30　　 保留作为用户自定义的信号1　　　　　　　 是
+SIGUSR2 　31　　 保留作为用户自定义的信号　　　　　　　　是 
+
+
+这篇文章页可以参考一下《关于SIGPIPE导致的程序退出》
+http://www.cppblog.com/elva/archive/2008/09/10/61544.html
+
+
