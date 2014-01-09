@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #endif
-#include "word.h"
+//#include "word.h"
 #define MAX_TEXT 2048 
 #define _MESSAGE_ROLE_HEADER  "EVP::EVP_HEADER_ROLE_FAMILY"
 #define _MESSAGE_SCENE_HEADER "EVP::EVP_HEADER_SCENE_FAMILY"

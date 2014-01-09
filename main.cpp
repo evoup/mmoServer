@@ -33,7 +33,7 @@
 #include "threadpool.h"
 #include <fcntl.h>
 #include "config.h"
-#include <json.h>
+//#include <json.h>
 #define MAXFD 64
 #define USE_DAEMON 1
 using namespace std;
@@ -120,7 +120,7 @@ evp_socket::evp_socket(){
             fprintf(stderr,"Usage:%s portnumbera ",av[0]);
             exit(1);
         }
-		if(0 != config_read()) fprintf(stderr,"Read configure file failed!");
+		//if(0 != config_read()) fprintf(stderr,"Read configure file failed!");
 		char serverInfoStr[200];
 		sprintf(serverInfoStr,"server max connection:%d\n",config.server_maxconn);
 		fprintf(stdout,serverInfoStr);
@@ -505,7 +505,7 @@ int createUiBody(int cmd,char * str){
 	strncat(str, (char *)"<SID>evoup</SID>",sizeof("<SID>evoup</SID>"));
 	//strncpy(str, (char *)"<CMD>", sizeof("<CMD>"));
 	strncat(str, (char *)"<TContent>time=20&word=",sizeof("<TContent>time=20&word=") );
-	strncat(str,(char *)_WELCOME_NEWBIE,sizeof(_WELCOME_NEWBIE));
+	strncat(str,(char *)"WELCOME_NEWBIE",sizeof("WELCOME_NEWBIE"));
 	strncat(str,(char *)"</TContent>",sizeof("</TContent>"));
 	return 0;
 }
