@@ -93,7 +93,7 @@ evp_socket::evp_socket(){
                     exit(0);/*父进程终止*/
                 }
                 setsid();//成为新会话
-                fprintf(stdout,"\033[33;40mIpWriteServer running as daemon!write by evoup\033[0;40m");
+                fprintf(stdout,"\033[33;40mIpWriteServer running as daemon!write by evoup\n\033[0;40m");
                 signal(SIGHUP,SIG_IGN);
                 if ( (pid = fork())!=0){//终止第一个子进程
                     exit(0);
